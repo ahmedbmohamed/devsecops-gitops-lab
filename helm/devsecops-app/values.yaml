@@ -3,7 +3,7 @@ replicaCount: 2
 image:
   repository: ghcr.io/ahmedbmohamed/devsecops-gitops-lab
   # The CI pipeline updates this tag automatically after each successful build
-  tag: "latest"
+  tag: "0c0430f"
   pullPolicy: IfNotPresent
 
 service:
