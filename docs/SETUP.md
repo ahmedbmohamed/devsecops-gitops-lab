@@ -90,8 +90,15 @@ curl http://localhost:8080/healthz
 
 ## 8. Prove the security gate works (great for the README)
 
-Temporarily pin an old base image in `app/Dockerfile` (for example `python:3.8-slim`),
-push, and show the pipeline **failing at the Trivy step**. Screenshot it, then revert.
+Open a pull request that adds a dependency with known, fixable vulnerabilities. Never push it to `main`.
+
+1. `git switch -c demo/trivy-gate main`
+2. Add `requests==2.19.1` to `app/requirements.txt`, commit, and `git push -u origin demo/trivy-gate`.
+3. Open a pull request into `main`. The pipeline runs on the PR: `test` passes, and
+   `build-scan-push` **fails at the Trivy step**, so the GHCR login, push and tag update steps are skipped.
+4. Screenshot the PR checks, the job steps and the Trivy findings.
+5. Close the PR **without merging**, then delete the branch:
+   `git branch -D demo/trivy-gate` and `git push origin --delete demo/trivy-gate`.
 
 ## Troubleshooting
 

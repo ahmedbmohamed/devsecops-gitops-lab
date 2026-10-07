@@ -90,6 +90,35 @@ See [docs/SETUP.md](docs/SETUP.md) for the full walkthrough (about 45 minutes).
 ![curl calls to the app's / and /healthz endpoints](docs/images/04-pods-and-curl.png)
 *Through a port-forward, `/` returns the deployed version (the commit SHA) and `/healthz` returns `ok`.*
 
+## GitOps in action
+
+I changed the app message and pushed. CI built, scanned and pushed the image, then committed the
+new tag to the Helm values. ArgoCD rolled it out with no manual command.
+
+![curl to the app returning the v2 message and version ac53bd0](docs/images/06-new-version-curl.png)
+*The app now answers "v2", with the new image tag `ac53bd0` as its version.*
+
+To test self-healing, I ran `kubectl scale deployment devsecops-app -n demo --replicas=5` by hand.
+ArgoCD (`selfHeal`) reverted it to 2 pods within seconds.
+
+![kubectl get pods showing three extra pods terminating after the manual scale](docs/images/07-selfheal.png)
+*The three extra pods are terminated about a second after they start; the two original pods keep running.*
+
+## Proof that the security gate blocks bad images
+
+I opened a pull request that added `requests==2.19.1`, a version with known vulnerabilities.
+
+![Pull request checks: test passed, build-scan-push failed](docs/images/09-pr-blocked.png)
+*On the PR, `test` passes and `build-scan-push` fails.*
+
+![build-scan-push job steps: Trivy scan failed, push steps skipped](docs/images/08b-gate-steps.png)
+*The pipeline stopped at the Trivy step. The GHCR login, image push and tag update were skipped, so nothing was pushed.*
+
+![Trivy findings for requests 2.19.1](docs/images/08c-trivy-findings.png)
+*Trivy found 7 HIGH vulnerabilities (0 CRITICAL) in `requests` 2.19.1, all fixed in later versions.*
+
+The PR was closed without merging, so `main` never received the vulnerable dependency.
+
 ## Problems I hit and fixed
 
 **Wrong action version.** The pipeline failed with `Unable to resolve action aquasecurity/trivy-action@0.28.0`.
