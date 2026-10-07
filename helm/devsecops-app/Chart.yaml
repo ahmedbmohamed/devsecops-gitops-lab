@@ -1,0 +1,6 @@
+apiVersion: v2
+name: devsecops-app
+description: Small Flask app used to demo a DevSecOps + GitOps pipeline
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
