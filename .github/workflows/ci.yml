@@ -12,6 +12,10 @@ on:
       - ".github/workflows/ci.yml"
   workflow_dispatch:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/devsecops-gitops-lab
 
@@ -81,9 +85,10 @@ jobs:
       - name: Update Helm image tag
         if: github.ref == 'refs/heads/main'
         run: |
-          sed -i "s|^  tag: .*|  tag: \"${TAG}\"|" helm/devsecops-app/values.yaml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          sed -i "s|^  tag: .*|  tag: \"${TAG}\"|" helm/devsecops-app/values.yaml
           git add helm/devsecops-app/values.yaml
           git commit -m "ci: deploy image ${TAG} [skip ci]" || echo "No change to commit"
           git push
