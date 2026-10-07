@@ -1,0 +1,86 @@
+name: CI - build, scan, push
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+  pull_request:
+    paths:
+      - "app/**"
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/devsecops-gitops-lab
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r app/requirements.txt pytest
+      - name: Run unit tests
+        working-directory: app
+        run: pytest -q
+
+  build-scan-push:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to commit the new image tag (GitOps step)
+      packages: write   # needed to push to GHCR
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tag (short commit SHA)
+        run: echo "TAG=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      # 1) Build locally (not pushed yet) so we can scan it first
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: app
+          load: true
+          tags: ${{ env.IMAGE }}:${{ env.TAG }}
+
+      # 2) Scan: fail the pipeline on HIGH / CRITICAL vulnerabilities
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.IMAGE }}:${{ env.TAG }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      # 3) Push only if the scan passed (main branch only)
+      - name: Log in to GHCR
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push image
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker tag "$IMAGE:$TAG" "$IMAGE:latest"
+          docker push "$IMAGE:$TAG"
+          docker push "$IMAGE:latest"
+
+      # 4) GitOps: update the tag in the Helm values; ArgoCD picks up the change
+      - name: Update Helm image tag
+        if: github.ref == 'refs/heads/main'
+        run: |
+          sed -i "s|^  tag: .*|  tag: \"${TAG}\"|" helm/devsecops-app/values.yaml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add helm/devsecops-app/values.yaml
+          git commit -m "ci: deploy image ${TAG} [skip ci]" || echo "No change to commit"
+          git push
