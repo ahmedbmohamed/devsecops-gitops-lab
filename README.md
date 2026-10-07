@@ -27,7 +27,7 @@ flowchart LR
 
 ## How it works
 
-1. A push to `main` that changes `app/` triggers the pipeline.
+1. The pipeline runs when `app/` or the workflow file (`.github/workflows/ci.yml`) changes, or manually via `workflow_dispatch`.
 2. **Test** → **Build** → **Trivy scan**. If a fixable HIGH or CRITICAL vulnerability is found, the pipeline fails and nothing is pushed.
 3. The image is pushed to GitHub Container Registry (`ghcr.io`) tagged with the short commit SHA.
 4. The pipeline commits the new tag into `helm/devsecops-app/values.yaml`.
@@ -93,8 +93,7 @@ See [docs/SETUP.md](docs/SETUP.md) for the full walkthrough (about 45 minutes).
 ## Problems I hit and fixed
 
 **Wrong action version.** The pipeline failed with `Unable to resolve action aquasecurity/trivy-action@0.28.0`.
-After a supply-chain attack, the Trivy maintainers moved every tag to a `v` prefix, so `0.28.0`
-no longer existed. I pinned the action to the full commit SHA of `v0.36.0`, checked against the
+The tag `0.28.0` no longer resolves; the upstream tags now have a `v` prefix. I pinned the action to the full commit SHA of `v0.36.0`, checked against the
 upstream repo with `git ls-remote`, so a moved or re-pointed tag can't change what runs. I also
 pinned the runner to `ubuntu-24.04` instead of `ubuntu-latest`.
 
@@ -117,3 +116,4 @@ from happening again.
 - Sign images with cosign
 - Add an Ingress and TLS
 - Add Prometheus metrics
+- Keep the Trivy scanner version current (the pipeline runs 0.70.0)
