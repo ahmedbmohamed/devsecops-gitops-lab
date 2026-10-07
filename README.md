@@ -58,12 +58,58 @@ See [docs/SETUP.md](docs/SETUP.md) for the full walkthrough (about 45 minutes).
 
 ## Screenshots
 
-Add your own screenshots to `docs/images/` and link them here:
+### CI pipeline
 
-- [ ] GitHub Actions run (green pipeline with the Trivy step)
-- [ ] ArgoCD UI showing the app `Synced` and `Healthy`
-- [ ] `kubectl get pods -n demo` output
-- [ ] The app answering in the browser or with `curl`
+![GitHub Actions run with test and build-scan-push jobs both green](docs/images/01-pipeline-green.png)
+*A push to `main` runs `test`, then `build-scan-push`. The whole run took under a minute.*
+
+![Steps of the build-scan-push job](docs/images/01b-pipeline-steps.png)
+*Inside `build-scan-push`: build, Trivy scan, push to GHCR, then commit the new image tag to the Helm values.*
+
+### Security gate (Trivy)
+
+![Trivy scan step output in the pipeline log](docs/images/02-trivy-scan.png)
+*Trivy scans the freshly built image before anything is pushed.*
+
+![Trivy scan result](docs/images/02b-trivy-result.png)
+*No fixable HIGH or CRITICAL vulnerabilities, so the pipeline is allowed to push.*
+
+![Trivy report legend: '0' means clean](docs/images/02c-trivy-legend.png)
+*In Trivy's report, `0` means the target was scanned and is clean.*
+
+### GitOps deployment (ArgoCD)
+
+![ArgoCD application devsecops-app shown as Healthy and Synced](docs/images/03-argocd-synced.png)
+*ArgoCD tracks `helm/devsecops-app` on `main` and reports the app `Healthy` and `Synced`.*
+
+![ArgoCD resource tree for devsecops-app](docs/images/03b-argocd-tree.png)
+*Synced to the CI bot's tag commit: Service, Deployment, ReplicaSet and two running pods.*
+
+### The running app
+
+![curl calls to the app's / and /healthz endpoints](docs/images/04-pods-and-curl.png)
+*Through a port-forward, `/` returns the deployed version (the commit SHA) and `/healthz` returns `ok`.*
+
+## Problems I hit and fixed
+
+**Wrong action version.** The pipeline failed with `Unable to resolve action aquasecurity/trivy-action@0.28.0`.
+After a supply-chain attack, the Trivy maintainers moved every tag to a `v` prefix, so `0.28.0`
+no longer existed. I pinned the action to the full commit SHA of `v0.36.0`, checked against the
+upstream repo with `git ls-remote`, so a moved or re-pointed tag can't change what runs. I also
+pinned the runner to `ubuntu-24.04` instead of `ubuntu-latest`.
+
+**Push race between two runs.** The last pipeline step commits the new image tag and pushes it to
+`main`. If two runs overlap, or `main` moves while a run is in progress, that push is rejected as
+non-fast-forward. Fix: a `concurrency` group per branch queues runs instead of running them in
+parallel, and the step runs `git pull --rebase origin main` before editing `values.yaml`, so the
+tag commit always lands on top of the latest `main`.
+
+**Docker Desktop auto-update stopped the cluster.** Docker Desktop updated itself in the
+background and restarted its engine. That restarted the minikube container on new ports, and
+`kubectl` failed with `connection refused`. `minikube status` showed the kubelet and API server
+stopped and the kubeconfig stale. Re-running `minikube start` brought everything back without
+data loss and rewrote the kubeconfig. Turning off Docker Desktop's automatic updates prevents it
+from happening again.
 
 ## What I learned / next steps
 
