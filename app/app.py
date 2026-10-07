@@ -7,7 +7,7 @@ app = Flask(__name__)
 @app.route("/")
 def index():
     return jsonify(
-        message="Hello from devsecops-gitops-lab",
+        message="Hello from my GitOps pipeline - v2",
         version=os.getenv("APP_VERSION", "dev"),
     )
 
