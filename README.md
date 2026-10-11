@@ -146,3 +146,8 @@ from happening again.
 - Add an Ingress and TLS
 - Add Prometheus metrics
 - Keep the Trivy scanner version current (the pipeline runs 0.70.0)
+
+## Author
+
+Ahmed Benmohamed, engineer in security of computer systems and networks (TEK-UP University, 2026).
+[LinkedIn](https://www.linkedin.com/in/ahmed-benmohamed-71b243309) · [Portfolio](https://ahmedbmohamed.github.io)
